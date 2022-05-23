@@ -108,11 +108,11 @@ taxed_amount <- function(income) {
     takings <- append(takings, taxed)
   }
   
-  tax_total <- sum(takings, ISR$fixed_fee[income_level])
+  tax_total <- sum(takings)
   
-  mean_tax_rate <- tax_total / income
+  fixed_tax <- ISR$fixed_fee[income_level]
   
-  return(c(tax_total, mean_tax_rate, marginal_tax_rate))
+  return(c(tax_total, marginal_tax_rate, fixed_tax))
 }
 
 subsidy_amount <- function(income) {
@@ -127,103 +127,130 @@ subsidy_amount <- function(income) {
   return(subsidy)
 }
 
+subsidy <- c()
+
+fixed_tax <- c()
 tax <- c()
 marginal_tax_rate <- c()
 mean_tax_rate <- c()
-subsidy <- c()
 
 for (i in 1:length(income)) {
   temp <- taxed_amount(income[i])
   tax <- append(tax, temp[1])
-  marginal_tax_rate <- append(marginal_tax_rate, temp[3])
-  mean_tax_rate <- append(mean_tax_rate, temp[2])
+  marginal_tax_rate <- append(marginal_tax_rate, temp[2])
+  fixed_tax <- append(fixed_tax, temp[3])
   subsidy <- append(subsidy, subsidy_amount(income[i]))
 }
 
-sims <- data.frame(
+withoutSubsidy <- data.frame(
   'Ingreso' = income,
   'Impuestos' = tax,
-  'Tasa Promedio' = mean_tax_rate,
   'Tasa Marginal' = marginal_tax_rate,
-  'Subsidio' = subsidy,
-  'Impuestos - Subsidios' = tax - subsidy,
-  'Ingreso - Impuestos' = income - tax,
-  'Ingreso Neto' = income - tax + subsidy
+  'Tasa Promedio' = tax / income
 )
 
-is.nan.data.frame <- function(x)
-  do.call(cbind, lapply(x, is.nan))
+withSubsidy <- data.frame(
+  'Ingreso' = income,
+  'Impuestos' = tax - subsidy,
+  'Tasa Marginal' = marginal_tax_rate,
+  'Tasa Promedio' = tax / (income + subsidy)
+)
 
-sims[is.nan(sims)] <- 0
+withSubsidy[withSubsidy <= 0] <- 0
 
-sims <- sims[-1, ]
+withSubsidy <- withSubsidy[-1,]
+withoutSubsidy <- withoutSubsidy[-1,]
+
+plot(withSubsidy$Ingreso, withSubsidy$Impuestos, type = 'l')
+lines(withoutSubsidy$Ingreso, withoutSubsidy$Impuestos)
 
 colours <-
-  c('Impuestos' = 'red',
-    'Impuestos - Subsidios' = 'black')
+  c('Con subsidio' = 'red',
+    'Sin subsidio' = 'black')
 
-ggplot() +
-  geom_point(
-    aes(
-      x = sims$Ingreso,
-      y = sims$Impuestos...Subsidios,
-      colour = 'Impuestos - Subsidios'
-    ),
-    size = 0.1
-  ) +
-  geom_point(aes(
-    x = sims$Ingreso,
-    y = sims$Impuestos,
-    colour = 'Impuestos'
+p.1 <- ggplot() +
+  geom_line(aes(
+    x = withSubsidy$Ingreso,
+    y = withSubsidy$Impuestos,
+    colour = 'Con subsidio'
   ),
-  size = 0.1) +
+  size = 0.2) +
+  geom_line(
+    aes(
+      x = withoutSubsidy$Ingreso,
+      y = withoutSubsidy$Impuestos,
+      colour = 'Sin subsidio'
+    ),
+    size = 0.2
+  ) +
   labs(x = 'Ingreso',
-       y = 'Pago de ISR') +
-  scale_colour_manual(name = NULL, values = colours) +
-  scale_x_continuous(trans = pseudolog10_trans) +
-  scale_y_continuous(trans = pseudolog10_trans)
+       y = 'ISR') +
+  scale_colour_manual(name = NULL, values = colours)
+
+p.2 <- p.1 +
+  xlim(0, 1e5) +
+  ylim(0, 1e4)
 
 colours <-
   c(
-    'Ingreso - Impuestos vs Tasa promedio' = 'green',
-    'Ingreso - Impuestos vs Tasa marginal' = 'black',
-    'Ingreso Neto vs Tasa Promedio' = 'blue',
-    'Ingreso Neto vs Tasa Marginal' = 'red'
+    'Tasa marginal con subsidio' = 'green',
+    'Tasa marginal sin subsidio' = 'black',
+    'Tasa promedio con subsidio' = 'red',
+    'Tasa promedio sin subsidio' = 'blue'
   )
 
-ggplot() +
-  geom_point(
+p.3 <- ggplot() +
+  geom_line(
     aes(
-      x = sims$Ingreso...Impuestos,
-      y = sims$Tasa.Promedio,
-      colour = 'Ingreso - Impuestos vs Tasa promedio'
+      x = withSubsidy$Ingreso,
+      y = withSubsidy$Tasa.Marginal,
+      colour = 'Tasa marginal con subsidio'
     ),
-    size = 0.01
+    size = 0.2
   ) +
-  geom_point(
+  geom_line(
     aes(
-      x = sims$Ingreso...Impuestos,
-      y = sims$Tasa.Marginal,
-      colour = 'Ingreso - Impuestos vs Tasa marginal'
+      x = withoutSubsidy$Ingreso,
+      y = withoutSubsidy$Tasa.Marginal,
+      colour = 'Tasa marginal sin subsidio'
     ),
-    size = 0.01
+    size = 0.2
   ) +
-  geom_point(
+  geom_line(
     aes(
-      x = sims$Ingreso.Neto,
-      y = sims$Tasa.Promedio,
-      colour = 'Ingreso Neto vs Tasa Promedio'
+      x = withoutSubsidy$Ingreso,
+      y = withoutSubsidy$Tasa.Promedio,
+      colour = 'Tasa promedio sin subsidio'
     ),
-    size = 0.01
+    size = 0.2
   ) +
-  geom_point(
+  geom_line(
     aes(
-      x = sims$Ingreso.Neto,
-      y = sims$Tasa.Marginal,
-      colour = 'Ingreso Neto vs Tasa Marginal'
+      x = withSubsidy$Ingreso,
+      y = withSubsidy$Tasa.Promedio,
+      colour = 'Tasa promedio con subsidio'
     ),
-    size = 0.01
+    size = 0.2
   ) +
   labs(x = 'Ingreso',
-       y = 'T') +
-  scale_colour_manual(name = NULL, values = colours)
+       y = 'Tasa') +
+  scale_colour_manual(name = NULL, values = colours) +
+  scale_y_continuous(
+    labels = function(x)
+      paste0(x * 100, '%')
+  )
+
+p.4 <- p.3 +
+  scale_x_log10() +
+  scale_y_continuous(
+    labels = function(x)
+      paste0(x * 100, '%')
+  ) +
+  labs(
+    caption = 'Ingreso en escala logarítmica'
+  )
+
+p.1
+p.2
+p.3
+p.4
