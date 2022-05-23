@@ -1,6 +1,8 @@
 library(tidyverse)
 library(ggallin)
 
+title <- 'out'
+
 theme_set(theme_minimal())
 
 income <- seq(0, 3500000, 1000)
@@ -254,3 +256,21 @@ p.1
 p.2
 p.3
 p.4
+
+plot.save <- function(title, plots) {
+  for (i in 1:length(plots)) {
+    ggsave(
+      path = paste(here::here(), '/out', sep = ''),
+      filename = paste(title, '-', i, '.png', sep = ''),
+      plot = plots[[i]],
+      width = 12,
+      height = 8,
+      bg = 'white'
+    )
+  }
+}
+
+plots <- list(p.1, p.2, p.3, p.4)
+
+plot.save(title = title,
+          plots = plots)
